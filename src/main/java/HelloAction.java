@@ -93,13 +93,21 @@ public class HelloAction extends AnAction {
     }
 
     private void changePackage(PsiClass containingClass, PsiClass anInterface) {
-        PsiPackageStatement packStatement = ((PsiJavaFile) containingClass.getContainingFile()).getPackageStatement();
+        PsiJavaFile containingFile = (PsiJavaFile) containingClass.getContainingFile();
+        PsiPackageStatement packStatement = containingFile.getPackageStatement();
         String newPackage = ((PsiJavaFile) anInterface.getContainingFile()).getPackageStatement().getPackageName();
         PsiPackageStatement newStatement = JavaPsiFacade.getElementFactory(project).createPackageStatement(newPackage);
-        Runnable r = () -> {
+        WriteCommandAction.runWriteCommandAction(project, () -> {
             packStatement.replace(newStatement);
-        };
-        WriteCommandAction.runWriteCommandAction(project, r);
+        });
+        String fullImportStatement = newPackage + "." + anInterface.getName();
+        log(fullImportStatement);
+
+        Optional<PsiImportStatementBase> wrongImport = Stream.of(containingFile.getImportList().getAllImportStatements()).filter(psiImportStatementBase -> psiImportStatementBase.getImportReference().getCanonicalText().equals(fullImportStatement)).findAny();
+        WriteCommandAction.runWriteCommandAction(project, () -> {
+            wrongImport.ifPresent(PsiElement::delete);
+        });
+
     }
 
     private List<PsiMethod> findMethodImpls(PsiMethod intMethod, PsiClass containingClass) {
