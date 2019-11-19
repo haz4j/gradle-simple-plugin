@@ -73,11 +73,23 @@ public class HelloAction extends AnAction {
 
             }
         }
+        String interfaceName = anInterface.getContainingFile().getName();
         PsiDirectory parent = anInterface.getContainingFile().getParent();
 
         deleteFile(anInterface);
         moveFile(containingClass, parent);
+        renameFile(containingClass, interfaceName);
+    }
 
+    private void renameFile(PsiClass containingClass, String name) {
+        Runnable r = () -> {
+            try {
+                containingClass.getContainingFile().getVirtualFile().rename("rename", name);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        };
+        WriteCommandAction.runWriteCommandAction(project, r);
     }
 
     private void moveFile(PsiClass containingClass, PsiDirectory parent) {
