@@ -57,6 +57,8 @@ public class HelloAction extends AnAction {
 
         PsiClass anInterface = interfaces[0];
 
+        PsiMethod previousClassMethod = null;
+
         for (PsiMethod intMethod : anInterface.getAllMethods()) {
 
             if (skipMethods.contains(intMethod.getName())) {
@@ -71,15 +73,16 @@ public class HelloAction extends AnAction {
                 continue;
             }
             if (classMethods.size() == 0) {
-                log("no imp of method - " + intMethod.getName() + ". Probably it's default method");
-                continue;
-            }
-            PsiMethod classMethod = classMethods.get(0);
-            if (intMethod.getDocComment() != null) {
-                addComment(intMethod, classMethod);
+                copyMethod(intMethod, previousClassMethod);
+            } else {
+                PsiMethod classMethod = classMethods.get(0);
+                if (intMethod.getDocComment() != null) {
+                    addComment(intMethod, classMethod);
+                }
+                //        deleteOverride(classMethod);
+                previousClassMethod = classMethod;
             }
 
-            //        deleteOverride(classMethod);
         }
 
         changePackage(containingClass, anInterface);
@@ -92,6 +95,26 @@ public class HelloAction extends AnAction {
         renameFile(containingClass, interfaceName);
     }
 
+    private void copyMethod(PsiMethod intMethod, PsiMethod previousClassMethod) {
+        Runnable r = () -> {
+            PsiElement newMethod = intMethod.copy();
+            PsiElement[] children = newMethod.getChildren();
+
+            for (PsiElement child : children) {
+                PsiElement defaultModificator = child;
+                log(defaultModificator.getText());
+                if (defaultModificator.getText().equals("default")) {
+//                    defaultModificator.delete();
+                }
+            }
+
+            final PsiElement variableParent = previousClassMethod.getParent();
+
+            variableParent.addAfter(newMethod, previousClassMethod);
+        };
+        WriteCommandAction.runWriteCommandAction(project, r);
+    }
+
     private void changePackage(PsiClass containingClass, PsiClass anInterface) {
         PsiJavaFile containingFile = (PsiJavaFile) containingClass.getContainingFile();
         PsiPackageStatement packStatement = containingFile.getPackageStatement();
@@ -101,7 +124,6 @@ public class HelloAction extends AnAction {
             packStatement.replace(newStatement);
         });
         String fullImportStatement = newPackage + "." + anInterface.getName();
-        log(fullImportStatement);
 
         Optional<PsiImportStatementBase> wrongImport = Stream.of(containingFile.getImportList().getAllImportStatements()).filter(psiImportStatementBase -> psiImportStatementBase.getImportReference().getCanonicalText().equals(fullImportStatement)).findAny();
         WriteCommandAction.runWriteCommandAction(project, () -> {
@@ -145,7 +167,7 @@ public class HelloAction extends AnAction {
             try {
                 containingClass.getContainingFile().getVirtualFile().rename("rename", name);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                log(e.getMessage());
             }
         };
         WriteCommandAction.runWriteCommandAction(project, r);
@@ -156,7 +178,7 @@ public class HelloAction extends AnAction {
             try {
                 containingClass.getContainingFile().getVirtualFile().move("move", parent.getVirtualFile());
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                log(e.getMessage());
             }
         };
         WriteCommandAction.runWriteCommandAction(project, r);
@@ -167,7 +189,7 @@ public class HelloAction extends AnAction {
             try {
                 anInterface.getContainingFile().getVirtualFile().delete("delete");
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                log(e.getMessage());
             }
         };
         WriteCommandAction.runWriteCommandAction(project, r);
