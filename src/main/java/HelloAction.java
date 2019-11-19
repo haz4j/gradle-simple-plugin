@@ -4,14 +4,17 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.psi.*;
-import com.intellij.psi.javadoc.PsiDocComment;
 import com.intellij.psi.util.PsiTreeUtil;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toList;
 
 public class HelloAction extends AnAction {
 
@@ -29,6 +32,7 @@ public class HelloAction extends AnAction {
 
         Editor editor = anActionEvent.getData(CommonDataKeys.EDITOR);
         PsiFile psiFile = anActionEvent.getData(CommonDataKeys.PSI_FILE);
+
         if (editor == null || psiFile == null) return;
         int offset = editor.getCaretModel().getOffset();
 
@@ -51,7 +55,6 @@ public class HelloAction extends AnAction {
             return;
         }
 
-
         PsiClass anInterface = interfaces[0];
 
         for (PsiMethod intMethod : anInterface.getAllMethods()) {
@@ -60,25 +63,73 @@ public class HelloAction extends AnAction {
                 continue;
             }
 
-            PsiDocComment docComment = intMethod.getDocComment();
-            if (docComment != null) {
-                log("method - " + intMethod.toString());
-                log("docComment - " + docComment.getText());
-            }
-            PsiMethod[] methodsInClass = containingClass.findMethodsByName(intMethod.getName(), false);
-            if (methodsInClass.length != 1) {
-                log("more than 1 imp of method - " + intMethod.getName());
-            } else {
-                PsiMethod methodInClass = methodsInClass[0];
+            List<PsiMethod> classMethods = findMethodImpls(intMethod, containingClass);
 
+            if (classMethods.size() > 1) {
+                log("more than 1 imp of method - " + intMethod.getName());
+                log(classMethods.stream().map(PsiElement::getText).collect(Collectors.joining(", ")));
+                continue;
             }
+            if (classMethods.size() == 0) {
+                log("no imp of method - " + intMethod.getName() + ". Probably it's default method");
+                continue;
+            }
+            PsiMethod classMethod = classMethods.get(0);
+            if (intMethod.getDocComment() != null) {
+                addComment(intMethod, classMethod);
+            }
+
+            //        deleteOverride(classMethod);
         }
+
+        changePackage(containingClass, anInterface);
+
         String interfaceName = anInterface.getContainingFile().getName();
         PsiDirectory parent = anInterface.getContainingFile().getParent();
 
         deleteFile(anInterface);
         moveFile(containingClass, parent);
         renameFile(containingClass, interfaceName);
+    }
+
+    private void changePackage(PsiClass containingClass, PsiClass anInterface) {
+        PsiPackageStatement packStatement = ((PsiJavaFile) containingClass.getContainingFile()).getPackageStatement();
+        String newPackage = ((PsiJavaFile) anInterface.getContainingFile()).getPackageStatement().getPackageName();
+        PsiPackageStatement newStatement = JavaPsiFacade.getElementFactory(project).createPackageStatement(newPackage);
+        Runnable r = () -> {
+            packStatement.replace(newStatement);
+        };
+        WriteCommandAction.runWriteCommandAction(project, r);
+    }
+
+    private List<PsiMethod> findMethodImpls(PsiMethod intMethod, PsiClass containingClass) {
+        return Stream.of(containingClass.getAllMethods()).filter(classMethod -> Arrays.asList(classMethod.findSuperMethods()).contains(intMethod)).collect(toList());
+    }
+
+    private void deleteOverride(PsiMethod classMethod) {
+        Runnable r = () -> {
+            log(classMethod.getChildren());
+            Optional<PsiElement> override = Stream.of(classMethod.getChildren()).filter(childElem -> childElem.getText().contains("@Override")).findAny();
+            override.ifPresent(psiElement -> {
+                log("delete");
+                psiElement.delete();
+//            classMethod.deleteChildRange(psiElement, psiElement);
+            });
+        };
+        WriteCommandAction.runWriteCommandAction(project, r);
+    }
+
+    private void log(PsiElement[] elems) {
+        Stream.of(elems).forEach(c -> log(c.getText()));
+    }
+
+    private void addComment(PsiMethod intMethod, PsiMethod classMethod) {
+        Runnable r = () -> {
+            PsiElement docComment = intMethod.getDocComment().copy();
+            final PsiElement variableParent = classMethod.getFirstChild();
+            classMethod.addBefore(docComment, variableParent);
+        };
+        WriteCommandAction.runWriteCommandAction(project, r);
     }
 
     private void renameFile(PsiClass containingClass, String name) {
@@ -116,6 +167,7 @@ public class HelloAction extends AnAction {
 
 
     public void log(String text) {
-        Messages.showMessageDialog(project, text, "Logger", null);
+//        Messages.showMessageDialog(project, text, "Logger", null);
+        System.err.println(text);
     }
 }
