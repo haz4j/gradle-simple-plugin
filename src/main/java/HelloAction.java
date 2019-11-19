@@ -5,10 +5,7 @@ import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.psi.PsiClass;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiMethod;
+import com.intellij.psi.*;
 import com.intellij.psi.javadoc.PsiDocComment;
 import com.intellij.psi.util.PsiTreeUtil;
 
@@ -75,9 +72,23 @@ public class HelloAction extends AnAction {
                 PsiMethod methodInClass = methodsInClass[0];
 
             }
-
-            deleteFile(anInterface);
         }
+        PsiDirectory parent = anInterface.getContainingFile().getParent();
+
+        deleteFile(anInterface);
+        moveFile(containingClass, parent);
+
+    }
+
+    private void moveFile(PsiClass containingClass, PsiDirectory parent) {
+        Runnable r = () -> {
+            try {
+                containingClass.getContainingFile().getVirtualFile().move("move", parent.getVirtualFile());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        };
+        WriteCommandAction.runWriteCommandAction(project, r);
     }
 
     private void deleteFile(PsiClass anInterface) {
