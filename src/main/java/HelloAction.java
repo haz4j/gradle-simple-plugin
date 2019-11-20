@@ -12,6 +12,7 @@ import com.intellij.psi.*;
 import com.intellij.psi.util.PsiTreeUtil;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -67,6 +68,10 @@ public class HelloAction extends AnAction {
 
         PsiMethod previousClassMethod = null;
 
+        if (anInterface.getDocComment() != null) {
+            addComment(anInterface, containingClass);
+        }
+
         for (PsiMethod intMethod : anInterface.getAllMethods()) {
 
             if (skipMethods.contains(intMethod.getName())) {
@@ -111,16 +116,16 @@ public class HelloAction extends AnAction {
 
         String classText = containingClass.getContainingFile().getText();
         String[] split = classText.split("\\n");
-        String newText = Stream.of(split)
+        List<String> lines = Stream.of(split)
                 .filter(line -> !line.contains("@Override"))
                 .map(line -> line
                         .replaceAll("default ", "public ")
                         .replaceAll("public class (.*)Impl implements (.*)", "public class $1 {")
                 )
-                .collect(joining("\n"));
+                .collect(toList());
 
         try {
-            Files.write(path, newText.getBytes());
+            Files.write(path, lines, StandardCharsets.UTF_8);
         } catch (IOException e) {
             log(e.getMessage());
         }
@@ -133,6 +138,15 @@ public class HelloAction extends AnAction {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    private void addComment(PsiClass from, PsiClass to) {
+        Runnable r = () -> {
+            PsiElement docComment = from.getDocComment().copy();
+            final PsiElement variableParent = to.getFirstChild();
+            to.addBefore(docComment, variableParent);
+        };
+        WriteCommandAction.runWriteCommandAction(project, r);
     }
 
     private void copyMethod(PsiMethod intMethod, PsiMethod previousClassMethod) {
