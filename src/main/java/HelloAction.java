@@ -2,6 +2,7 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
@@ -73,16 +74,22 @@ public class HelloAction extends AnAction {
                 continue;
             }
             if (classMethods.size() == 0) {
-                copyMethod(intMethod, previousClassMethod);
+                copyMethod(editor.getDocument(), intMethod, previousClassMethod);
             } else {
                 PsiMethod classMethod = classMethods.get(0);
                 if (intMethod.getDocComment() != null) {
                     addComment(intMethod, classMethod);
                 }
-                //        deleteOverride(classMethod);
                 previousClassMethod = classMethod;
             }
+        }
 
+        for (PsiMethod classMethod : containingClass.getAllMethods()) {
+            if (skipMethods.contains(classMethod.getName())) {
+                continue;
+            }
+
+            deleteOverrideAndDefault(editor.getDocument(), classMethod);
         }
 
         changePackage(containingClass, anInterface);
@@ -95,19 +102,36 @@ public class HelloAction extends AnAction {
         renameFile(containingClass, interfaceName);
     }
 
-    private void copyMethod(PsiMethod intMethod, PsiMethod previousClassMethod) {
+
+    private void deleteOverrideAndDefault(Document document, PsiMethod classMethod) {
+        PsiElement[] children = classMethod.getChildren();
+
+        for (PsiElement child : children) {
+            PsiElement defaultModificator = child;
+            String text = "default";
+            if (defaultModificator.getText().equals(text)) {
+                int start = defaultModificator.getTextOffset();
+                int length = text.length() + 1;
+                log("defaultModificator" + defaultModificator);
+                log("defaultModificator.getTextOffset" + start);
+                log("length" + length);
+                replaceText(document, start, length, "");
+
+                PsiDocumentManager manager = PsiDocumentManager.getInstance(project);
+                manager.commitDocument(document);
+            }
+        }
+    }
+
+    private void replaceText(Document document, int offset, int length, String newText) {
+        WriteCommandAction.runWriteCommandAction(project, () ->
+                document.replaceString(offset, offset + length, newText)
+        );
+    }
+
+    private void copyMethod(Document document, PsiMethod intMethod, PsiMethod previousClassMethod) {
         Runnable r = () -> {
             PsiElement newMethod = intMethod.copy();
-            PsiElement[] children = newMethod.getChildren();
-
-            for (PsiElement child : children) {
-                PsiElement defaultModificator = child;
-                log(defaultModificator.getText());
-                if (defaultModificator.getText().equals("default")) {
-//                    defaultModificator.delete();
-                }
-            }
-
             final PsiElement variableParent = previousClassMethod.getParent();
 
             variableParent.addAfter(newMethod, previousClassMethod);
@@ -134,19 +158,6 @@ public class HelloAction extends AnAction {
 
     private List<PsiMethod> findMethodImpls(PsiMethod intMethod, PsiClass containingClass) {
         return Stream.of(containingClass.getAllMethods()).filter(classMethod -> Arrays.asList(classMethod.findSuperMethods()).contains(intMethod)).collect(toList());
-    }
-
-    private void deleteOverride(PsiMethod classMethod) {
-        Runnable r = () -> {
-            log(classMethod.getChildren());
-            Optional<PsiElement> override = Stream.of(classMethod.getChildren()).filter(childElem -> childElem.getText().contains("@Override")).findAny();
-            override.ifPresent(psiElement -> {
-                log("delete");
-                psiElement.delete();
-//            classMethod.deleteChildRange(psiElement, psiElement);
-            });
-        };
-        WriteCommandAction.runWriteCommandAction(project, r);
     }
 
     private void log(PsiElement[] elems) {
