@@ -74,7 +74,7 @@ public class HelloAction extends AnAction {
                 continue;
             }
             if (classMethods.size() == 0) {
-                copyMethod(editor.getDocument(), intMethod, previousClassMethod);
+                copyMethod(intMethod, previousClassMethod);
             } else {
                 PsiMethod classMethod = classMethods.get(0);
                 if (intMethod.getDocComment() != null) {
@@ -88,8 +88,6 @@ public class HelloAction extends AnAction {
             if (skipMethods.contains(classMethod.getName())) {
                 continue;
             }
-
-            deleteOverrideAndDefault(editor.getDocument(), classMethod);
         }
 
         changePackage(containingClass, anInterface);
@@ -102,35 +100,7 @@ public class HelloAction extends AnAction {
         renameFile(containingClass, interfaceName);
     }
 
-
-    private void deleteOverrideAndDefault(Document document, PsiMethod classMethod) {
-        PsiDocumentManager manager = PsiDocumentManager.getInstance(project);
-        manager.commitDocument(document);
-
-        PsiElement[] children = classMethod.getChildren();
-
-        for (PsiElement child : children) {
-            PsiElement defaultModificator = child;
-            String text = "default";
-            if (defaultModificator.getText().equals(text)) {
-                int start = defaultModificator.getTextOffset();
-                int length = text.length() + 1;
-                log("defaultModificator" + defaultModificator);
-                log("defaultModificator.getTextOffset" + start);
-                log("length" + length);
-                replaceText(document, start, length, "public");
-                manager.commitDocument(document);
-            }
-        }
-    }
-
-    private void replaceText(Document document, int offset, int length, String newText) {
-        WriteCommandAction.runWriteCommandAction(project, () ->
-                document.replaceString(offset, offset + length, newText)
-        );
-    }
-
-    private void copyMethod(Document document, PsiMethod intMethod, PsiMethod previousClassMethod) {
+    private void copyMethod(PsiMethod intMethod, PsiMethod previousClassMethod) {
         Runnable r = () -> {
             PsiElement newMethod = intMethod.copy();
             final PsiElement variableParent = previousClassMethod.getParent();
