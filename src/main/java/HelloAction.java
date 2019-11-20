@@ -104,6 +104,9 @@ public class HelloAction extends AnAction {
 
 
     private void deleteOverrideAndDefault(Document document, PsiMethod classMethod) {
+        PsiDocumentManager manager = PsiDocumentManager.getInstance(project);
+        manager.commitDocument(document);
+
         PsiElement[] children = classMethod.getChildren();
 
         for (PsiElement child : children) {
@@ -115,9 +118,7 @@ public class HelloAction extends AnAction {
                 log("defaultModificator" + defaultModificator);
                 log("defaultModificator.getTextOffset" + start);
                 log("length" + length);
-                replaceText(document, start, length, "");
-
-                PsiDocumentManager manager = PsiDocumentManager.getInstance(project);
+                replaceText(document, start, length, "public");
                 manager.commitDocument(document);
             }
         }
