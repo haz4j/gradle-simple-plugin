@@ -140,15 +140,6 @@ public class HelloAction extends AnAction {
         }
     }
 
-    private void addComment(PsiClass from, PsiClass to) {
-        Runnable r = () -> {
-            PsiElement docComment = from.getDocComment().copy();
-            final PsiElement variableParent = to.getFirstChild();
-            to.addBefore(docComment, variableParent);
-        };
-        WriteCommandAction.runWriteCommandAction(project, r);
-    }
-
     private void copyMethod(PsiMethod intMethod, PsiMethod previousClassMethod) {
         Runnable r = () -> {
             PsiElement newMethod = intMethod.copy();
@@ -184,11 +175,13 @@ public class HelloAction extends AnAction {
         Stream.of(elems).forEach(c -> log(c.getText()));
     }
 
-    private void addComment(PsiMethod intMethod, PsiMethod classMethod) {
+    private void addComment(PsiJavaDocumentedElement from, PsiJavaDocumentedElement to) {
         Runnable r = () -> {
-            PsiElement docComment = intMethod.getDocComment().copy();
-            final PsiElement variableParent = classMethod.getFirstChild();
-            classMethod.addBefore(docComment, variableParent);
+            PsiElement docComment = from.getDocComment().copy();
+            List<PsiElement> inheritComments = Stream.of(to.getChildren()).filter(child -> child.getText().contains("inheritDoc")).collect(toList());
+//            inheritComments.forEach(PsiElement::delete);
+            final PsiElement child = to.getFirstChild();
+            to.addBefore(docComment, child);
         };
         WriteCommandAction.runWriteCommandAction(project, r);
     }
