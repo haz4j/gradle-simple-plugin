@@ -99,10 +99,10 @@ public class HelloAction extends AnAction {
 
         changePackage(containingClass, anInterface);
 
-        String interfaceName = anInterface.getContainingFile().getName();
-        PsiDirectory parent = anInterface.getContainingFile().getParent();
+        Path path = Paths.get(anInterface.getContainingFile().getVirtualFile().getPath());
 
         deleteFile(anInterface);
+        deleteFile(containingClass);
 
         project.save();
         FileDocumentManager.getInstance().saveAllDocuments();
@@ -113,10 +113,11 @@ public class HelloAction extends AnAction {
         String[] split = classText.split("\\n");
         String newText = Stream.of(split)
                 .filter(line -> !line.contains("@Override"))
-                .map(line -> line.replaceAll("default ", "public "))
+                .map(line -> line
+                        .replaceAll("default ", "public ")
+                        .replaceAll("public class (.*)Impl implements (.*)", "public class $1 {")
+                )
                 .collect(joining("\n"));
-
-        Path path = Paths.get(containingClass.getContainingFile().getVirtualFile().getPath());
 
         try {
             Files.write(path, newText.getBytes());
