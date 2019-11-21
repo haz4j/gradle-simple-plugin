@@ -22,7 +22,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 public class HelloAction extends AnAction {
@@ -67,6 +66,8 @@ public class HelloAction extends AnAction {
         PsiClass anInterface = interfaces[0];
 
         PsiMethod previousClassMethod = null;
+
+        deteteInheritDoc(containingClass);
 
         if (anInterface.getDocComment() != null) {
             addComment(anInterface, containingClass);
@@ -140,6 +141,25 @@ public class HelloAction extends AnAction {
         }
     }
 
+    private void deteteInheritDoc(PsiClass clazz) {
+        Runnable r = () -> {
+            deleteLastChildContainingText(clazz);
+        };
+        WriteCommandAction.runWriteCommandAction(project, r);
+    }
+
+    private void deleteLastChildContainingText(PsiElement parent) {
+        PsiElement[] childs = parent.getChildren();
+
+        for (PsiElement child : childs) {
+            deleteLastChildContainingText(child);
+            String cleanedText = child.getText().replaceAll("\\*", "").replaceAll("//", "").trim();
+            if (cleanedText.matches("\\s?\\{\\@inheritDoc\\}\\s?")) {
+                parent.delete();
+            }
+        }
+    }
+
     private void copyMethod(PsiMethod intMethod, PsiMethod previousClassMethod) {
         Runnable r = () -> {
             PsiElement newMethod = intMethod.copy();
@@ -178,8 +198,6 @@ public class HelloAction extends AnAction {
     private void addComment(PsiJavaDocumentedElement from, PsiJavaDocumentedElement to) {
         Runnable r = () -> {
             PsiElement docComment = from.getDocComment().copy();
-            List<PsiElement> inheritComments = Stream.of(to.getChildren()).filter(child -> child.getText().contains("inheritDoc")).collect(toList());
-//            inheritComments.forEach(PsiElement::delete);
             final PsiElement child = to.getFirstChild();
             to.addBefore(docComment, child);
         };
