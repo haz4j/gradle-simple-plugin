@@ -29,32 +29,28 @@ public class HelloAction extends AnAction {
     private List<String> skipMethods = Arrays.asList("registerNatives", "Object", "getClass", "hashCode",
             "equals", "clone", "toString", "notify", "notifyAll", "wait", "wait", "wait", "finalize");
 
-    Project project = null;
+    private Project project = null;
+    private PsiClass containingClass;
 
     public HelloAction() {
         super("Hello");
     }
 
     public void actionPerformed(AnActionEvent anActionEvent) {
+
         project = anActionEvent.getProject();
 
         Editor editor = anActionEvent.getData(CommonDataKeys.EDITOR);
         PsiFile psiFile = anActionEvent.getData(CommonDataKeys.PSI_FILE);
-
         if (editor == null || psiFile == null) return;
-        int offset = editor.getCaretModel().getOffset();
 
-        PsiElement element = psiFile.findElementAt(offset);
-        if (element == null) {
-            return;
-        }
-
-        PsiMethod containingMethod = PsiTreeUtil.getParentOfType(element, PsiMethod.class);
-        if (containingMethod == null) {
-            return;
-        }
-
-        PsiClass containingClass = containingMethod.getContainingClass();
+        psiFile.accept(new JavaRecursiveElementVisitor() {
+            @Override
+            public void visitClass(PsiClass aClass) {
+                super.visitClass(aClass);
+                containingClass = aClass;
+            }
+        });
 
         PsiClass[] interfaces = containingClass.getInterfaces();
 
@@ -124,6 +120,8 @@ public class HelloAction extends AnAction {
                         .replaceAll("public class (.*)Impl implements (.*)", "public class $1 {")
                 )
                 .collect(toList());
+
+//        PsiFileFactory.getInstance(project).createFileFromText(lines.stream().collect(Collectors.joining()), )
 
         try {
             Files.write(path, lines, StandardCharsets.UTF_8);
