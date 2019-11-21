@@ -9,7 +9,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ex.ProjectManagerEx;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.*;
-import com.intellij.psi.util.PsiTreeUtil;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -40,9 +39,8 @@ public class HelloAction extends AnAction {
 
         project = anActionEvent.getProject();
 
-        Editor editor = anActionEvent.getData(CommonDataKeys.EDITOR);
         PsiFile psiFile = anActionEvent.getData(CommonDataKeys.PSI_FILE);
-        if (editor == null || psiFile == null) return;
+        if (psiFile == null) return;
 
         psiFile.accept(new JavaRecursiveElementVisitor() {
             @Override

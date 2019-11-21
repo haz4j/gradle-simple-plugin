@@ -21,6 +21,7 @@
     <actions>
         <action id="Myplugin.Textboxes" class="HelloAction" text="Hello" description="Says hello">
             <keyboard-shortcut keymap="$default" first-keystroke="control alt G"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
     </actions>
