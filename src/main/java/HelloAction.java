@@ -3,13 +3,15 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ex.ProjectManagerEx;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -38,10 +40,35 @@ public class HelloAction extends AnAction {
     public void actionPerformed(AnActionEvent anActionEvent) {
 
         project = anActionEvent.getProject();
+        VirtualFile file = anActionEvent.getData(CommonDataKeys.VIRTUAL_FILE);
+        List<PsiFile> psiFiles = null;
 
-        PsiFile psiFile = anActionEvent.getData(CommonDataKeys.PSI_FILE);
-        if (psiFile == null) return;
+        if (file.isDirectory()) {
+            try {
+                List<Path> collect = Files.walk(Paths.get(file.getPath()))
+                        .filter(s -> s.toString().endsWith("Impl.java"))
+                        .collect(toList());
+                psiFiles = collect.stream().map(col -> {
+                    File file1 = new File(col.toUri());
+                    VirtualFile fileByIoFile = LocalFileSystem.getInstance().findFileByIoFile(file1);
+                    PsiFile file2 = PsiManager.getInstance(project).findFile(fileByIoFile);
+                    return file2;
+                }).collect(toList());
 
+
+            } catch (IOException e) {
+                log(e.getMessage());
+            }
+        } else {
+            PsiFile psiFile = anActionEvent.getData(CommonDataKeys.PSI_FILE);
+            if (psiFile == null) return;
+            psiFiles = Arrays.asList(psiFile);
+        }
+        psiFiles.forEach(this::process);
+
+    }
+
+    private void process(PsiFile psiFile) {
         psiFile.accept(new JavaRecursiveElementVisitor() {
             @Override
             public void visitClass(PsiClass aClass) {
@@ -114,7 +141,7 @@ public class HelloAction extends AnAction {
         List<String> lines = Stream.of(split)
                 .filter(line -> !line.contains("@Override"))
                 .map(line -> line
-                        .replaceAll("default ", "public ")
+                        .replaceAll("^(\\s*?)default\\s(.*)\\(", "$1public $2(")
                         .replaceAll("public class (.*)Impl implements (.*)", "public class $1 {")
                 )
                 .collect(toList());
@@ -159,7 +186,7 @@ public class HelloAction extends AnAction {
     private void copyMethod(PsiMethod intMethod, PsiMethod previousClassMethod) {
         Runnable r = () -> {
             PsiElement newMethod = intMethod.copy();
-            final PsiElement variableParent = previousClassMethod.getParent();
+            final PsiElement variableParent = previousClassMethod == null ? null : previousClassMethod.getParent();
 
             variableParent.addAfter(newMethod, previousClassMethod);
         };
