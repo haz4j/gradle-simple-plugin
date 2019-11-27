@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -91,6 +92,7 @@ public class MergeAction extends AnAction {
         };
     }
 
+    @Nullable
     private PsiClass getInterface() {
         PsiClass[] interfaces = currentClass.getInterfaces();
         if (interfaces.length != 1) {
@@ -136,7 +138,7 @@ public class MergeAction extends AnAction {
         refresh();
     }
 
-    private void updateClassFile(Path path) {
+    private void updateClassFile(@NotNull Path path) {
         String classText = currentClass.getContainingFile().getText();
         String[] split = classText.split("\\n");
         List<String> lines = Stream.of(split)
@@ -164,7 +166,7 @@ public class MergeAction extends AnAction {
         FileDocumentManager.getInstance().saveAllDocuments();
     }
 
-    private void mergeMethods(PsiClass currentInterface) {
+    private void mergeMethods(@NotNull PsiClass currentInterface) {
         PsiMethod previousClassMethod = null;
         for (PsiMethod intMethod : currentInterface.getAllMethods()) {
             if (SKIP_METHODS.contains(intMethod.getName())) {
@@ -196,7 +198,7 @@ public class MergeAction extends AnAction {
         WriteCommandAction.runWriteCommandAction(project, r);
     }
 
-    private void deleteLastChildContainingText(PsiElement parent) {
+    private void deleteLastChildContainingText(@NotNull PsiElement parent) {
         PsiElement[] childs = parent.getChildren();
 
         for (PsiElement child : childs) {
@@ -208,12 +210,14 @@ public class MergeAction extends AnAction {
         }
     }
 
-    private void copyMethod(PsiMethod intMethod, PsiMethod previousClassMethod) {
+    private void copyMethod(@NotNull PsiMethod intMethod, @Nullable PsiMethod previousClassMethod) {
         Runnable r = () -> {
             PsiElement newMethod = intMethod.copy();
-            final PsiElement variableParent = previousClassMethod == null ? null : previousClassMethod.getParent();
+            PsiElement variableParent = previousClassMethod == null ? null : previousClassMethod.getParent();
+            if (variableParent != null) {
+                variableParent.addAfter(newMethod, previousClassMethod);
+            }
 
-            variableParent.addAfter(newMethod, previousClassMethod);
         };
         WriteCommandAction.runWriteCommandAction(project, r);
     }
