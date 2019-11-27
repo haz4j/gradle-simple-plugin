@@ -5,7 +5,6 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ex.ProjectManagerEx;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -92,7 +91,7 @@ public class MergeAction extends AnAction {
         };
     }
 
-    private PsiClass getInterface(){
+    private PsiClass getInterface() {
         PsiClass[] interfaces = currentClass.getInterfaces();
         if (interfaces.length != 1) {
             return null;
@@ -156,20 +155,13 @@ public class MergeAction extends AnAction {
     }
 
     private void refresh() {
-        try {
-            Thread.sleep(500L);
-            SaveAndSyncHandler.getInstance().refreshOpenFiles();
-            VirtualFileManager.getInstance().refreshWithoutFileWatcher(false);
-            ProjectManagerEx.getInstanceEx().unblockReloadingProjectOnExternalChanges();
-        } catch (InterruptedException e) {
-            log(e.getMessage());
-        }
+        SaveAndSyncHandler.getInstance().refreshOpenFiles();
+        VirtualFileManager.getInstance().refreshWithoutFileWatcher(false);
     }
 
     private void save() {
         project.save();
         FileDocumentManager.getInstance().saveAllDocuments();
-        ProjectManagerEx.getInstanceEx().blockReloadingProjectOnExternalChanges();
     }
 
     private void mergeMethods(PsiClass currentInterface) {
@@ -252,28 +244,6 @@ public class MergeAction extends AnAction {
             PsiElement docComment = from.getDocComment().copy();
             final PsiElement child = to.getFirstChild();
             to.addBefore(docComment, child);
-        };
-        WriteCommandAction.runWriteCommandAction(project, r);
-    }
-
-    private void renameFile(PsiClass containingClass, String name) {
-        Runnable r = () -> {
-            try {
-                containingClass.getContainingFile().getVirtualFile().rename("rename", name);
-            } catch (IOException e) {
-                log(e.getMessage());
-            }
-        };
-        WriteCommandAction.runWriteCommandAction(project, r);
-    }
-
-    private void moveFile(PsiClass containingClass, PsiDirectory parent) {
-        Runnable r = () -> {
-            try {
-                containingClass.getContainingFile().getVirtualFile().move("move", parent.getVirtualFile());
-            } catch (IOException e) {
-                log(e.getMessage());
-            }
         };
         WriteCommandAction.runWriteCommandAction(project, r);
     }
