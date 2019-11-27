@@ -28,10 +28,10 @@ import static java.util.stream.Collectors.toList;
 public class MergeAction extends AnAction {
 
     private static List<String> SKIP_METHODS = Arrays.asList("registerNatives", "Object", "getClass", "hashCode",
-            "equals", "clone", "toString", "notify", "notifyAll", "wait", "wait", "wait", "finalize");
+            "equals", "clone", "toString", "notify", "notifyAll", "wait", "finalize");
 
     private Project project;
-    private PsiClass containingClass;
+    private PsiClass currentClass;
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent anActionEvent) {
@@ -92,39 +92,93 @@ public class MergeAction extends AnAction {
         };
     }
 
-    private void process(PsiFile psiFile) {
+    private PsiClass getInterface(){
+        PsiClass[] interfaces = currentClass.getInterfaces();
+        if (interfaces.length != 1) {
+            return null;
+        }
+        return interfaces[0];
+    }
+
+    private void process(@NotNull PsiFile psiFile) {
         psiFile.accept(new JavaRecursiveElementVisitor() {
             @Override
             public void visitClass(PsiClass aClass) {
                 super.visitClass(aClass);
-                containingClass = aClass;
+                currentClass = aClass;
             }
         });
 
-        PsiClass[] interfaces = containingClass.getInterfaces();
-
-        if (interfaces.length != 1) {
-            log("More than 1 interface");
+        PsiClass currentInterface = getInterface();
+        if (currentInterface == null) {
+            log("Can't find the only interface");
             return;
         }
 
-        PsiClass anInterface = interfaces[0];
+        deleteInheritDoc();
 
-        PsiMethod previousClassMethod = null;
-
-        deteteInheritDoc(containingClass);
-
-        if (anInterface.getDocComment() != null) {
-            addComment(anInterface, containingClass);
+        if (currentInterface.getDocComment() != null) {
+            addComment(currentInterface, currentClass);
         }
 
-        for (PsiMethod intMethod : anInterface.getAllMethods()) {
+        mergeMethods(currentInterface);
 
+        changePackage(currentClass, currentInterface);
+
+        Path path = Paths.get(currentInterface.getContainingFile().getVirtualFile().getPath());
+
+        deleteFile(currentInterface);
+        deleteFile(currentClass);
+
+        save();
+
+        updateClassFile(path);
+
+        refresh();
+    }
+
+    private void updateClassFile(Path path) {
+        String classText = currentClass.getContainingFile().getText();
+        String[] split = classText.split("\\n");
+        List<String> lines = Stream.of(split)
+                .filter(line -> !line.contains("@Override"))
+                .map(line -> line
+                        .replaceAll("^(\\s*?)default\\s(.*)\\(", "$1public $2(")
+                        .replaceAll("public class (.*)Impl implements (.*)", "public class $1 {")
+                )
+                .collect(toList());
+
+        try {
+            Files.write(path, lines, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log(e.getMessage());
+        }
+    }
+
+    private void refresh() {
+        try {
+            Thread.sleep(500L);
+            SaveAndSyncHandler.getInstance().refreshOpenFiles();
+            VirtualFileManager.getInstance().refreshWithoutFileWatcher(false);
+            ProjectManagerEx.getInstanceEx().unblockReloadingProjectOnExternalChanges();
+        } catch (InterruptedException e) {
+            log(e.getMessage());
+        }
+    }
+
+    private void save() {
+        project.save();
+        FileDocumentManager.getInstance().saveAllDocuments();
+        ProjectManagerEx.getInstanceEx().blockReloadingProjectOnExternalChanges();
+    }
+
+    private void mergeMethods(PsiClass currentInterface) {
+        PsiMethod previousClassMethod = null;
+        for (PsiMethod intMethod : currentInterface.getAllMethods()) {
             if (SKIP_METHODS.contains(intMethod.getName())) {
                 continue;
             }
-
-            List<PsiMethod> classMethods = findMethodImpls(intMethod, containingClass);
+            List<PsiMethod> classMethods = findMethodImpls(intMethod, currentClass);
 
             if (classMethods.size() > 1) {
                 log("more than 1 imp of method - " + intMethod.getName());
@@ -141,50 +195,11 @@ public class MergeAction extends AnAction {
                 previousClassMethod = classMethod;
             }
         }
-
-        changePackage(containingClass, anInterface);
-
-        Path path = Paths.get(anInterface.getContainingFile().getVirtualFile().getPath());
-
-        deleteFile(anInterface);
-        deleteFile(containingClass);
-
-        project.save();
-        FileDocumentManager.getInstance().saveAllDocuments();
-        ProjectManagerEx.getInstanceEx().blockReloadingProjectOnExternalChanges();
-
-
-        String classText = containingClass.getContainingFile().getText();
-        String[] split = classText.split("\\n");
-        List<String> lines = Stream.of(split)
-                .filter(line -> !line.contains("@Override"))
-                .map(line -> line
-                        .replaceAll("^(\\s*?)default\\s(.*)\\(", "$1public $2(")
-                        .replaceAll("public class (.*)Impl implements (.*)", "public class $1 {")
-                )
-                .collect(toList());
-
-//        PsiFileFactory.getInstance(project).createFileFromText(lines.stream().collect(Collectors.joining()), )
-
-        try {
-            Files.write(path, lines, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            log(e.getMessage());
-        }
-
-        try {
-            Thread.sleep(500L);
-            SaveAndSyncHandler.getInstance().refreshOpenFiles();
-            VirtualFileManager.getInstance().refreshWithoutFileWatcher(false);
-            ProjectManagerEx.getInstanceEx().unblockReloadingProjectOnExternalChanges();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
     }
 
-    private void deteteInheritDoc(PsiClass clazz) {
+    private void deleteInheritDoc() {
         Runnable r = () -> {
-            deleteLastChildContainingText(clazz);
+            deleteLastChildContainingText(currentClass);
         };
         WriteCommandAction.runWriteCommandAction(project, r);
     }
