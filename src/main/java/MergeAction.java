@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.*;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,9 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -30,38 +30,66 @@ public class MergeAction extends AnAction {
     private static List<String> SKIP_METHODS = Arrays.asList("registerNatives", "Object", "getClass", "hashCode",
             "equals", "clone", "toString", "notify", "notifyAll", "wait", "wait", "wait", "finalize");
 
-    private Project project = null;
+    private Project project;
     private PsiClass containingClass;
 
-    public void actionPerformed(AnActionEvent anActionEvent) {
-
+    @Override
+    public void actionPerformed(@NotNull AnActionEvent anActionEvent) {
         project = anActionEvent.getProject();
-        VirtualFile file = anActionEvent.getData(CommonDataKeys.VIRTUAL_FILE);
-        List<PsiFile> psiFiles = null;
-
-        if (file.isDirectory()) {
-            try {
-                List<Path> collect = Files.walk(Paths.get(file.getPath()))
-                        .filter(s -> s.toString().endsWith("Impl.java"))
-                        .collect(toList());
-                psiFiles = collect.stream().map(col -> {
-                    File file1 = new File(col.toUri());
-                    VirtualFile fileByIoFile = LocalFileSystem.getInstance().findFileByIoFile(file1);
-                    PsiFile file2 = PsiManager.getInstance(project).findFile(fileByIoFile);
-                    return file2;
-                }).collect(toList());
-
-
-            } catch (IOException e) {
-                log(e.getMessage());
-            }
-        } else {
-            PsiFile psiFile = anActionEvent.getData(CommonDataKeys.PSI_FILE);
-            if (psiFile == null) return;
-            psiFiles = Arrays.asList(psiFile);
-        }
+        List<PsiFile> psiFiles = getFiles(anActionEvent);
         psiFiles.forEach(this::process);
+    }
 
+    @NotNull
+    private List<PsiFile> getFiles(@NotNull AnActionEvent anActionEvent) {
+        VirtualFile file = anActionEvent.getData(CommonDataKeys.VIRTUAL_FILE);
+        if (file == null) {
+            log("Can't find file");
+            return Collections.emptyList();
+        }
+        if (file.isDirectory()) {
+            return getFilesFromDirectory(file);
+        } else {
+            return getFile(anActionEvent);
+        }
+    }
+
+    @NotNull
+    private List<PsiFile> getFile(@NotNull AnActionEvent anActionEvent) {
+        PsiFile psiFile = anActionEvent.getData(CommonDataKeys.PSI_FILE);
+        if (psiFile == null) {
+            return Collections.emptyList();
+        } else {
+            return Collections.singletonList(psiFile);
+        }
+    }
+
+    @NotNull
+    private List<PsiFile> getFilesFromDirectory(@NotNull VirtualFile file) {
+        try {
+            List<Path> collect = Files.walk(Paths.get(file.getPath()))
+                    .filter(s -> s.toString().endsWith("Impl.java"))
+                    .collect(toList());
+            return collect.stream()
+                    .map(pathToPsiFile())
+                    .filter(Objects::nonNull)
+                    .collect(toList());
+        } catch (IOException e) {
+            log(e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    @NotNull
+    private Function<Path, PsiFile> pathToPsiFile() {
+        return col -> {
+            VirtualFile vFile = LocalFileSystem.getInstance().findFileByIoFile(new File(col.toUri()));
+            if (vFile == null) {
+                return null;
+            } else {
+                return PsiManager.getInstance(project).findFile(vFile);
+            }
+        };
     }
 
     private void process(PsiFile psiFile) {
