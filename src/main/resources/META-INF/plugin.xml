@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>com.haz.gradle-plugin</id>
+    <id>com.haz.merge-ints-plugin</id>
     <name>Interface merger</name>
     <vendor email="saltpan@gmail.com"/>
     <description>This plugin merge interface with it's implementation</description>
