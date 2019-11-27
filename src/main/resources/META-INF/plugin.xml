@@ -1,28 +1,13 @@
 <idea-plugin>
     <id>com.haz.gradle-plugin</id>
-    <name>Plugin display name here</name>
-    <vendor email="support@yourcompany.com" url="http://www.yourcompany.com">YourCompany</vendor>
-
-    <description><![CDATA[
-    Enter short description for your plugin here.<br>
-    <em>most HTML tags may be used</em>
-    ]]></description>
-
-    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
-         on how to target different products -->
-    <!-- uncomment to enable plugin in all products
-    <depends>com.intellij.modules.lang</depends>
-    -->
-
-    <extensions defaultExtensionNs="com.intellij">
-        <!-- Add your extensions here -->
-    </extensions>
-
+    <name>Interface merger</name>
+    <vendor email="saltpan@gmail.com"/>
+    <description>This plugin merge interface with it's implementation</description>
+    <extensions defaultExtensionNs="com.intellij"/>
     <actions>
-        <action id="Myplugin.Textboxes" class="HelloAction" text="Hello" description="Says hello">
+        <action id="MergePlugin.merge" class="MergeAction" text="Merge with Interface" description="Merge service implementation with interface">
             <keyboard-shortcut keymap="$default" first-keystroke="control alt G"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

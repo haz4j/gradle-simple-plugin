@@ -25,17 +25,13 @@ import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
 
-public class HelloAction extends AnAction {
+public class MergeAction extends AnAction {
 
-    private List<String> skipMethods = Arrays.asList("registerNatives", "Object", "getClass", "hashCode",
+    private static List<String> SKIP_METHODS = Arrays.asList("registerNatives", "Object", "getClass", "hashCode",
             "equals", "clone", "toString", "notify", "notifyAll", "wait", "wait", "wait", "finalize");
 
     private Project project = null;
     private PsiClass containingClass;
-
-    public HelloAction() {
-        super("Hello");
-    }
 
     public void actionPerformed(AnActionEvent anActionEvent) {
 
@@ -96,7 +92,7 @@ public class HelloAction extends AnAction {
 
         for (PsiMethod intMethod : anInterface.getAllMethods()) {
 
-            if (skipMethods.contains(intMethod.getName())) {
+            if (SKIP_METHODS.contains(intMethod.getName())) {
                 continue;
             }
 
@@ -115,12 +111,6 @@ public class HelloAction extends AnAction {
                     addComment(intMethod, classMethod);
                 }
                 previousClassMethod = classMethod;
-            }
-        }
-
-        for (PsiMethod classMethod : containingClass.getAllMethods()) {
-            if (skipMethods.contains(classMethod.getName())) {
-                continue;
             }
         }
 
@@ -212,10 +202,6 @@ public class HelloAction extends AnAction {
 
     private List<PsiMethod> findMethodImpls(PsiMethod intMethod, PsiClass containingClass) {
         return Stream.of(containingClass.getAllMethods()).filter(classMethod -> Arrays.asList(classMethod.findSuperMethods()).contains(intMethod)).collect(toList());
-    }
-
-    private void log(PsiElement[] elems) {
-        Stream.of(elems).forEach(c -> log(c.getText()));
     }
 
     private void addComment(PsiJavaDocumentedElement from, PsiJavaDocumentedElement to) {
