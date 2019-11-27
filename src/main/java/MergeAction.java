@@ -222,7 +222,7 @@ public class MergeAction extends AnAction {
         WriteCommandAction.runWriteCommandAction(project, r);
     }
 
-    private void changePackage(PsiClass containingClass, PsiClass anInterface) {
+    private void changePackage(@NotNull PsiClass containingClass, @NotNull PsiClass anInterface) {
         PsiJavaFile containingFile = (PsiJavaFile) containingClass.getContainingFile();
         PsiPackageStatement packStatement = containingFile.getPackageStatement();
         String newPackage = ((PsiJavaFile) anInterface.getContainingFile()).getPackageStatement().getPackageName();
@@ -239,11 +239,11 @@ public class MergeAction extends AnAction {
 
     }
 
-    private List<PsiMethod> findMethodImpls(PsiMethod intMethod, PsiClass containingClass) {
+    private List<PsiMethod> findMethodImpls(@NotNull PsiMethod intMethod, @NotNull PsiClass containingClass) {
         return Stream.of(containingClass.getAllMethods()).filter(classMethod -> Arrays.asList(classMethod.findSuperMethods()).contains(intMethod)).collect(toList());
     }
 
-    private void addComment(PsiJavaDocumentedElement from, PsiJavaDocumentedElement to) {
+    private void addComment(@NotNull PsiJavaDocumentedElement from, @NotNull PsiJavaDocumentedElement to) {
         Runnable r = () -> {
             PsiElement docComment = from.getDocComment().copy();
             final PsiElement child = to.getFirstChild();
@@ -252,7 +252,7 @@ public class MergeAction extends AnAction {
         WriteCommandAction.runWriteCommandAction(project, r);
     }
 
-    private void deleteFile(PsiClass anInterface) {
+    private void deleteFile(@NotNull PsiClass anInterface) {
         Runnable r = () -> {
             try {
                 anInterface.getContainingFile().getVirtualFile().delete("delete");
@@ -264,7 +264,7 @@ public class MergeAction extends AnAction {
     }
 
 
-    public void log(String text) {
+    public void log(@NotNull String text) {
 //        Messages.showMessageDialog(project, text, "Logger", null);
         System.err.println(text);
     }
